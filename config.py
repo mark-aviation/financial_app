@@ -12,8 +12,8 @@ APP_GEOMETRY = "1400x900"
 # --- Database ---
 DB_CONFIG_FILE = "db_config.json"
 DB_POOL_NAME = "expensis_pool"
-DB_POOL_SIZE = 5
-DB_CONNECTION_TIMEOUT = 5
+DB_POOL_SIZE = 15
+DB_CONNECTION_TIMEOUT = 10
 
 DB_DEFAULTS = {
     "host": "your_database_host",
