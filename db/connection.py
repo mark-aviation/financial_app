@@ -15,7 +15,10 @@ import json
 import logging
 import os
 from contextlib import contextmanager
+from config import DB_POOL_SIZE
 
+from mysql.connector import pooling
+from contextlib import contextmanager
 import mysql.connector
 from mysql.connector import pooling, Error as MySQLError
 
@@ -34,11 +37,58 @@ _pool: pooling.MySQLConnectionPool | None = None
 
 # SQLAlchemy engine — for pandas read_sql() calls
 _engine = None
+_connection_pool = None
 
 
 # ---------------------------------------------------------------------------
 # Config helpers
 # ---------------------------------------------------------------------------
+def init_db_pool():
+    """Initializes the database connection pool on application startup."""
+    global _connection_pool
+    
+    if _connection_pool is not None:
+        return # Pool already initialized
+        
+    try:
+        # Get your database credentials (username, password, host, database name)
+        db_config = load_db_config()
+        
+        # Create the pool using the settings from config.py
+        _connection_pool = mysql.connector.pooling.MySQLConnectionPool(
+            pool_name="finance_app_pool",
+            pool_size=DB_POOL_SIZE,  # <--- This is where the tuning happens
+            pool_reset_session=True, # Resets variables when connection is returned
+            **db_config 
+        )
+        print(f"Database connection pool initialized with size: {DB_POOL_SIZE}")
+        
+    except mysql.connector.Error as err:
+        print(f"Error initializing connection pool: {err}")
+        raise
+
+@contextmanager
+def get_connection():
+    """
+    Context manager to borrow a connection from the pool and return it when done.
+    Usage:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # ... execute queries ...
+    """
+    if _connection_pool is None:
+         # Failsafe in case it wasn't initialized at startup
+         init_db_pool() 
+         
+    try:
+        # Borrow a connection
+        connection = _connection_pool.get_connection()
+        yield connection
+    finally:
+        # Ensure the connection is ALWAYS returned to the pool, even if errors occur
+        if connection.is_connected():
+            connection.close()
+
 
 def load_db_config() -> dict:
     """Load DB config from JSON file, falling back to defaults."""
@@ -282,3 +332,5 @@ def get_connection():
                 conn.close()  # Returns to pool, does not close TCP connection
             except Exception:
                 pass
+
+
