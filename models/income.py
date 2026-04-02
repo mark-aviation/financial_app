@@ -24,8 +24,21 @@ def get_income_df(user_id: int, filter_mode: str = "This Month") -> pd.DataFrame
         if engine:
             df = pd.read_sql(sql, engine, params={"user_id": user_id})
         else:
-            with get_connection() as conn:
-                df = pd.read_sql(sql.replace("%(user_id)s", "%s"), conn, params=(user_id,))
+            # Fallback: use SQLAlchemy-compatible connection format
+            from sqlalchemy import create_engine
+            from config import DB_CONFIG_FILE
+            cfg = load_db_config()
+            try:
+                engine = create_engine(
+                    f"mysql+pymysql://{cfg['user']}:{cfg['password']}"
+                    f"@{cfg['host']}:{int(cfg.get('port', 3306))}/{cfg['database']}",
+                    pool_pre_ping=True
+                )
+                df = pd.read_sql(sql, engine, params={"user_id": user_id})
+            except Exception:
+                # Last resort: use raw connection
+                with get_connection() as conn:
+                    df = pd.read_sql(sql.replace("%(user_id)s", "%s"), conn, params=(user_id,))
 
         if df.empty:
             return df
