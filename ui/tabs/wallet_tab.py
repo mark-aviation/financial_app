@@ -70,12 +70,23 @@ class WalletTab:
         self.bal_tree.column("Balance", width=120)
         self.bal_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
+        btn_frame = ctk.CTkFrame(left, fg_color="transparent")
+        btn_frame.pack(pady=(4, 12), padx=10, fill="x")
+        btn_frame.columnconfigure((0, 1), weight=1)
+        
         ctk.CTkButton(
-            left, text="⇄  Transfer Funds",
+            btn_frame, text="⇄  Transfer",
             command=self._open_transfer_dialog,
             fg_color=COLORS["primary"], hover_color="#1a6fa8",
-            font=("Roboto", 13, "bold"), height=34,
-        ).pack(pady=(4, 12))
+            font=("Roboto", 12, "bold"), height=34,
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        
+        ctk.CTkButton(
+            btn_frame, text="±  Adjust Balance",
+            command=self._open_adjust_dialog,
+            fg_color="#f39c12", hover_color="#d68910",
+            font=("Roboto", 12, "bold"), height=34,
+        ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
         right = ctk.CTkFrame(self.frame, corner_radius=12)
         right.grid(row=1, column=1, sticky="nsew", padx=(8, 15), pady=8)
 
@@ -338,6 +349,129 @@ class WalletTab:
             button_frame, text="Confirm Transfer",
             command=_do_transfer,
             fg_color=COLORS["primary"], hover_color="#1a6fa8",
+            height=36, width=130,
+            font=("Roboto", 12, "bold"),
+        ).pack(side="left", padx=6)
+        
+        ctk.CTkButton(
+            button_frame, text="Cancel",
+            command=dialog.destroy,
+            fg_color="gray30", height=36, width=130
+        ).pack(side="left", padx=6)
+
+    # ------------------------------------------------------------------
+    # Wallet Balance Adjustment Dialog
+    # ------------------------------------------------------------------
+
+    def _open_adjust_dialog(self):
+        """Open dialog to add or subtract from a specific wallet balance."""
+        wallets = get_wallet_list(self.user_id)
+        if not wallets:
+            messagebox.showwarning("Adjust Balance", "You have no wallets yet.")
+            return
+
+        dialog = ctk.CTkToplevel(self.frame)
+        dialog.title("Adjust Wallet Balance")
+        dialog.geometry("420x380")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+
+        ctk.CTkLabel(dialog, text="Adjust Wallet Balance", font=("Roboto", 16, "bold")).pack(pady=(15, 4))
+        ctk.CTkLabel(dialog, text="Fix transfer mistakes by adding or subtracting from any wallet.",
+                     font=("Roboto", 11), text_color="gray").pack(pady=(0, 12))
+
+        # Get wallet balances for reference
+        mode = self.filter_mode.get()
+        balances = {row["wallet"]: row["balance"] for row in get_wallet_balances(self.user_id, mode)}
+
+        form = ctk.CTkFrame(dialog, fg_color="transparent")
+        form.pack(fill="x", padx=20)
+        form.columnconfigure(1, weight=1)
+
+        # Wallet selection
+        ctk.CTkLabel(form, text="Wallet:", anchor="w", font=("Roboto", 11, "bold")).grid(row=0, column=0, sticky="w", pady=8)
+        wallet_var = ctk.StringVar(value=wallets[0])
+        wallet_menu = ctk.CTkOptionMenu(form, variable=wallet_var, values=wallets, width=200)
+        wallet_menu.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        
+        lbl_balance = ctk.CTkLabel(form, text="", font=("Roboto", 10), text_color="gray")
+        lbl_balance.grid(row=1, column=1, sticky="e", padx=(10, 0), pady=(0, 12))
+
+        # Operation type (Add/Subtract)
+        ctk.CTkLabel(form, text="Operation:", anchor="w", font=("Roboto", 11, "bold")).grid(row=2, column=0, sticky="w", pady=8)
+        op_var = ctk.StringVar(value="Add")
+        op_frame = ctk.CTkFrame(form, fg_color="transparent")
+        op_frame.grid(row=2, column=1, sticky="ew", padx=(10, 0))
+        for op in ["Add", "Subtract"]:
+            ctk.CTkRadioButton(op_frame, text=op, variable=op_var, value=op).pack(side="left", padx=10)
+
+        # Amount
+        ctk.CTkLabel(form, text="Amount:", anchor="w", font=("Roboto", 11, "bold")).grid(row=3, column=0, sticky="w", pady=8)
+        ent_amount = ctk.CTkEntry(form, placeholder_text="0.00", width=200)
+        ent_amount.grid(row=3, column=1, sticky="ew", padx=(10, 0))
+
+        # Date
+        ctk.CTkLabel(form, text="Date:", anchor="w", font=("Roboto", 11, "bold")).grid(row=4, column=0, sticky="w", pady=8)
+        ent_date = ctk.CTkEntry(form, placeholder_text="YYYY-MM-DD", width=200)
+        ent_date.insert(0, datetime.now().strftime(DATE_FORMAT))
+        ent_date.grid(row=4, column=1, sticky="ew", padx=(10, 0))
+
+        # Note/Description
+        ctk.CTkLabel(form, text="Note:", anchor="w", font=("Roboto", 11, "bold")).grid(row=5, column=0, sticky="w", pady=8)
+        ent_note = ctk.CTkEntry(form, placeholder_text="e.g., Transfer correction", width=200)
+        ent_note.grid(row=5, column=1, sticky="ew", padx=(10, 0))
+
+        # Update balance labels when wallet selection changes
+        def _update_balance_display(*_):
+            bal = balances.get(wallet_var.get(), 0)
+            lbl_balance.configure(text=f"Current Balance: ₱{bal:,.2f}")
+
+        wallet_var.trace("w", _update_balance_display)
+        _update_balance_display()  # Initial display
+
+        def _do_adjustment():
+            wallet = wallet_var.get()
+            operation = op_var.get()
+            
+            try:
+                amount = float(ent_amount.get())
+                if amount <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Error", "Enter a valid positive amount.", parent=dialog)
+                return
+            
+            # Determine final amount (negative for subtract)
+            final_amount = amount if operation == "Add" else -amount
+            note = ent_note.get().strip() or f"{operation}ed ₱{amount:,.2f}"
+            
+            # Confirm adjustment
+            if not messagebox.askyesno(
+                "Confirm Adjustment",
+                f"{operation} ₱{amount:,.2f}\nto wallet: {wallet}\n\nConfirm?",
+                parent=dialog
+            ):
+                return
+
+            # Record the adjustment as income (with negative amount for subtract)
+            if add_income(self.user_id, ent_date.get(), wallet, final_amount):
+                messagebox.showinfo(
+                    "Success",
+                    f"✓ {operation}ed ₱{amount:,.2f}\nto {wallet}",
+                    parent=dialog,
+                )
+                dialog.destroy()
+                bus.publish("income.saved")
+            else:
+                messagebox.showerror("Error", "Adjustment failed. Check logs.", parent=dialog)
+
+        button_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        button_frame.pack(pady=(16, 10))
+        
+        ctk.CTkButton(
+            button_frame, text="Apply Adjustment",
+            command=_do_adjustment,
+            fg_color="#f39c12", hover_color="#d68910",
             height=36, width=130,
             font=("Roboto", 12, "bold"),
         ).pack(side="left", padx=6)
