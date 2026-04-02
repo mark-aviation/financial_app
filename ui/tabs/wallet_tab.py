@@ -63,11 +63,19 @@ class WalletTab:
         self.progress_budget.set(0)
 
         ctk.CTkLabel(left, text="Per-Wallet Balance", font=("Roboto", 14, "bold")).pack(pady=(20, 5))
-        self.bal_tree = ttk.Treeview(left, columns=("Wallet", "Balance"), show="headings", height=6)
+        
+        # Configure ttk.Treeview style for dark theme visibility
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('Treeview', foreground='white', background='#2b2b2b', fieldbackground='#2b2b2b', font=('Roboto', 11))
+        style.configure('Treeview.Heading', foreground='white', background='#1e1e1e', font=('Roboto', 11, 'bold'))
+        style.map('Treeview', background=[('selected', '#0da3e7')], foreground=[('selected', 'white')])
+        
+        self.bal_tree = ttk.Treeview(left, columns=("Wallet", "Balance"), show="headings", height=6, style='Treeview')
         self.bal_tree.heading("Wallet",  text="Wallet")
         self.bal_tree.heading("Balance", text="Balance")
-        self.bal_tree.column("Wallet",  width=160)
-        self.bal_tree.column("Balance", width=120)
+        self.bal_tree.column("Wallet",  width=140)
+        self.bal_tree.column("Balance", width=140)
         self.bal_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
         btn_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -103,7 +111,7 @@ class WalletTab:
         ctk.CTkButton(form, text="Add", command=self._add_income, width=60).pack(side="left", padx=3)
 
         self.inc_tree = ttk.Treeview(right, columns=("ID","Date","Source","Amount"),
-                                     show="headings", height=12)
+                                     show="headings", height=12, style='Treeview')
         for col, w in zip(("ID","Date","Source","Amount"), (40,100,150,100)):
             self.inc_tree.heading(col, text=col)
             self.inc_tree.column(col, width=w)
