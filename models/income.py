@@ -26,7 +26,7 @@ def get_income_df(user_id: int, filter_mode: str = "This Month") -> pd.DataFrame
         else:
             # Fallback: use SQLAlchemy-compatible connection format
             from sqlalchemy import create_engine
-            from config import DB_CONFIG_FILE
+            from db.connection import load_db_config
             cfg = load_db_config()
             try:
                 engine = create_engine(

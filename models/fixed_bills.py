@@ -22,8 +22,21 @@ def get_fixed_bills(user_id: int) -> list[dict]:
         if engine:
             df = pd.read_sql(sql, engine, params={"user_id": user_id})
         else:
-            with get_connection() as conn:
-                df = pd.read_sql(sql.replace("%(user_id)s", "%s"), conn, params=(user_id,))
+            # Fallback: create a temporary SQLAlchemy engine
+            from sqlalchemy import create_engine
+            from db.connection import load_db_config
+            cfg = load_db_config()
+            try:
+                engine = create_engine(
+                    f"mysql+pymysql://{cfg['user']}:{cfg['password']}"
+                    f"@{cfg['host']}:{int(cfg.get('port', 3306))}/{cfg['database']}",
+                    pool_pre_ping=True
+                )
+                df = pd.read_sql(sql, engine, params={"user_id": user_id})
+            except Exception:
+                # Last resort: use raw connection
+                with get_connection() as conn:
+                    df = pd.read_sql(sql.replace("%(user_id)s", "%s"), conn, params=(user_id,))
         if df.empty:
             return []
         return df.to_dict("records")
