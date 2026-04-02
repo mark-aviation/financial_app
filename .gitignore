@@ -1,0 +1,45 @@
+# Environment & Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+*.env
+.env.local
+.env.*.local
+
+# Sensitive Configuration
+db_config.json
+config.py.local
+credentials.json
+secrets.json
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.pyc
+__pycache__/
+
+# Build & Distribution
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+*.exe
+*.whl
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Project-specific
+New folder/
+exp[ensois advanve/
+expensis_v3/
+expensis_web/
+*.log
