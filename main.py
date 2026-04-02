@@ -5,6 +5,7 @@ import logging
 import threading
 from config import LOG_LEVEL
 from db.connection import init_pool
+from db.connection import init_db_pool
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.WARNING),
